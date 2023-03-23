@@ -14,24 +14,21 @@ export default function App() {
   useEffect(() => {
     zeroconf.on('start', () => console.log('The scan has started.'))
     zeroconf.on('stop', () => console.log('The scan has stopped.'))
-    zeroconf.on('resolved', (props) => console.log('service resolved', props))
-    console.log(zeroconf)
-    
-
-    const startScanning = () => {
-      try {
-        zeroconf.scan("arduino", "tcp", "local.");
-      } catch (err) {
-        console.warn(err);
-        setTimeout(() => {
-          startScanning()
-        }, 1000)
+    zeroconf.on('resolved', (props) => {
+      console.log('service resolved', props)
+      if(props.name === "LightStrip")
+      {
+        setservice({
+          address : props.addresses[0],
+          port : props.port
+        })
+        setlightsFound(true)
       }
-    }
-
-    startScanning()
-    // zeroconf.scan(type = 'http', protocol = 'tcp', domain = 'local.')
-   
+    })
+    zeroconf.on('found', (props) => console.log('service found', props))
+    // zeroconf.scan(undefined, undefined, undefined, 'DNSSD')
+    zeroconf.scan()   
+    console.log("reached")
   }, [])
   
 
@@ -39,7 +36,7 @@ export default function App() {
   {
     return (
       <View style={styles.container}>
-        <Remote />
+        <Remote service={service}/>
         <StatusBar style="auto" />
       </View>
     );

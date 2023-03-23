@@ -1,9 +1,11 @@
 import { View, Text, ActivityIndicator, StyleSheet, Button, Pressable, Image, TextInput } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ScrollView } from 'react-native';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { TouchableOpacity } from 'react-native';
 import * as Network from 'expo-network';
+import TcpSocket from 'react-native-tcp-socket';
+import Loader from './loader';
 // import InputColor from 'react-input-color';
 
 const modes = {
@@ -71,7 +73,7 @@ const PowerSaving = ({checked, onToggled, addedDevices=[], removeDevice, addThis
 
 }
 
-const Remote = () => {
+const Remote = ({service}) => {
     const [primaryColor, setPrimaryColor] = React.useState({});
     const [secondaryColor, setsecondaryColor] = useState({})
     const [mode, setmode] = useState(modes.BASIC)
@@ -79,6 +81,58 @@ const Remote = () => {
     const [addedDevices, setaddedDevices] = useState(["00:1B:44:11:3A:B7", "12:12:44:11:3A:B7", "00:1B:77:88:99:B7", "AA:BB:CC:11:3A:BB"]) // TODO :make this empty
     const [thisDevice, setthisDevice] = useState("")
 
+    const [client, setclient] = useState(null)
+    const [readyToRemote, setreadyToRemote] = useState(true)
+
+    useEffect(() => {
+        const options = {
+            port: service.port,
+            host: service.address,
+            // localAddress: '127.0.0.1',
+            reuseAddress: true,
+            // localPort: 20000,
+            // interface: "wifi",
+          };
+          
+          // Create socket
+          const client = TcpSocket.createConnection(options, () => {
+            // Write on the socket
+            client.write('Hello server!');
+          });
+          
+          client.on('data', function(data) {
+            console.log('message was received', data);
+            console.log(String.fromCharCode.apply(String, data))
+            try
+            {
+                data = JSON.parse(data)
+                
+                let PrimaryRGB = data.PrimaryRGB
+                let SecondaryRGB = data.SecondaryRGB
+
+                setPrimaryColor(rgbToHex(PrimaryRGB[0], PrimaryRGB[1], PrimaryRGB[2]))
+                setsecondaryColor(rgbToHex(SecondaryRGB[0], SecondaryRGB[1], SecondaryRGB[2]))
+                setmode(data.light_mode)
+                setpowerSaving(data.powersaving)
+
+                setreadyToRemote(true)
+
+            }
+            catch(e)
+            {
+                console.log("JSON parsing failed", e)
+            }
+          });
+          
+          client.on('error', function(error) {
+            console.log(error);
+          });
+          
+          client.on('close', function(){
+            console.log('Connection closed!');
+          });
+    }, [])
+    
 
     const [textInputVal, settextInputVal] = useState("")
     // TODO : set initial values obtained from NodeMCU using useEffect
@@ -120,6 +174,15 @@ const Remote = () => {
         modifiedDevices.push(p_device)
         setaddedDevices(modifiedDevices)
         // TODO : send to NodeMCU
+    }
+
+    if(!readyToRemote)
+    {
+        return (
+            <View>
+                <Loader message={"Connecting to Lights. Please wait..."} />
+            </View>
+        )
     }
   return (
     <View>
@@ -213,6 +276,24 @@ const styles = StyleSheet.create({
     disabledButton : {
         backgroundColor:"#FF0000",
     }
-  });
+});
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+  
+  function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function hexToRgb(hex) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+}
 
 export default Remote 
