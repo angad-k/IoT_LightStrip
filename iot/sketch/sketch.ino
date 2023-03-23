@@ -100,6 +100,44 @@ void handle_cmd(String cmd)
       Serial.println(PrimaryRGB[i]);
     }
   }
+
+  if(cmd.startsWith("cmd_sec"))
+  {
+    String working_cmd = cmd.substring(8);
+    Serial.println("secondary : ");
+    for(int i = 0; i < 3; i++)
+    {
+      int next_ind = working_cmd.indexOf(" ");
+      int col = working_cmd.substring(0, next_ind).toInt();
+      SecondaryRGB[i] = col;
+      working_cmd = working_cmd.substring(next_ind+1);
+      Serial.println(SecondaryRGB[i]);
+    }
+  }
+
+  if(cmd.startsWith("cmd_mod"))
+  {
+    String working_cmd = cmd.substring(8);
+    working_cmd.trim();
+    light_mode = working_cmd;
+    Serial.println("lightmode : ");
+    Serial.println(light_mode);
+  }
+
+  if(cmd.startsWith("cmd_pow"))
+  {
+    if(cmd[8]==0)
+    {
+      powersaving = false;
+    }
+    else
+    {
+      powersaving = true;
+    }
+
+    Serial.println("powersaving : ");
+    Serial.println(powersaving);
+  }
 }
 void loop() {
   MDNS.update();
@@ -117,8 +155,8 @@ void loop() {
       if (client.available())
       {
         String line = client.readStringUntil('\n');
+        Serial.println(line);
         handle_cmd(line);
-        Serial.print(line);
       }
     }
 
