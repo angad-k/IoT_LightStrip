@@ -85,6 +85,22 @@ void setup() {
   Serial.println("mDNS responder started");
 }
 
+void handle_cmd(String cmd)
+{
+  if(cmd.startsWith("cmd_pri"))
+  {
+    String working_cmd = cmd.substring(8);
+    Serial.println("primarycolor : ");
+    for(int i = 0; i < 3; i++)
+    {
+      int next_ind = working_cmd.indexOf(" ");
+      int col = working_cmd.substring(0, next_ind).toInt();
+      PrimaryRGB[i] = col;
+      working_cmd = working_cmd.substring(next_ind+1);
+      Serial.println(PrimaryRGB[i]);
+    }
+  }
+}
 void loop() {
   MDNS.update();
 
@@ -100,14 +116,9 @@ void loop() {
       // read line by line what the client (web browser) is requesting
       if (client.available())
       {
-        String line = client.readStringUntil('\r');
+        String line = client.readStringUntil('\n');
+        handle_cmd(line);
         Serial.print(line);
-        // wait for end of client's request, that is marked with an empty line
-        if (line.length() == 1 && line[0] == '\n')
-        {
-//          client.println("{'data' : 'Hello from ESP8266'}");
-          break;
-        }
       }
     }
 

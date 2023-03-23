@@ -97,7 +97,7 @@ const Remote = ({service}) => {
           // Create socket
           const client = TcpSocket.createConnection(options, () => {
             // Write on the socket
-            client.write('Hello server!');
+            console.log("connected")
           });
           
           client.on('data', function(data) {
@@ -131,33 +131,47 @@ const Remote = ({service}) => {
           client.on('close', function(){
             console.log('Connection closed!');
           });
+
+          setclient(client)
     }, [])
     
 
     const [textInputVal, settextInputVal] = useState("")
-    // TODO : set initial values obtained from NodeMCU using useEffect
 
     const onPrimaryColorChangeComplete = (p_color)=> {
         setPrimaryColor(p_color)
         console.log(p_color)
-        // TODO : send to NodeMCU
+        p_color = hexToRgb(p_color)
+        console.log(p_color)
+        client.write("cmd_pri " + p_color.r + " " + p_color.g + " " + p_color.b + "\n")
     }
     const onSecondaryColorChangeComplete = (p_color)=> {
         setsecondaryColor(p_color)
         console.log(p_color)
-        // TODO : send to NodeMCU
+        p_color = hexToRgb(p_color)
+        console.log(p_color)
+        client.write("cmd_sec " + p_color.r + " " + p_color.g + " " + p_color.b + "\n")
     }
 
     const onModeChanged = (p_mode) => {
         console.log(p_mode)
         setmode(p_mode)
-        // TODO : send to NodeMCU
+        client.write("cmd_mod " + p_mode + " \n")
     }
 
     const onPowerSavingToggled = () => {
         console.log("Power Saving toggled")
         setpowerSaving(!powerSaving)
-        // TODO : send to NodeMCU
+        let x = !powerSaving
+        if(x)
+        {
+            client.write("cmd_pow 1 \n")
+        }
+        else
+        {
+            client.write("cmd_pow 0 \n")
+        }
+        
     }
 
     const removeDevice = (p_device) => {
