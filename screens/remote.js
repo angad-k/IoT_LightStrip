@@ -78,7 +78,7 @@ const Remote = ({service}) => {
     const [secondaryColor, setsecondaryColor] = useState({})
     const [mode, setmode] = useState(modes.BASIC)
     const [powerSaving, setpowerSaving] = useState(false)
-    const [addedDevices, setaddedDevices] = useState(["00:1B:44:11:3A:B7", "12:12:44:11:3A:B7", "00:1B:77:88:99:B7", "AA:BB:CC:11:3A:BB"]) // TODO :make this empty
+    const [addedDevices, setaddedDevices] = useState([])
     const [thisDevice, setthisDevice] = useState("")
 
     const [client, setclient] = useState(null)
@@ -114,7 +114,7 @@ const Remote = ({service}) => {
                 setsecondaryColor(rgbToHex(SecondaryRGB[0], SecondaryRGB[1], SecondaryRGB[2]))
                 setmode(data.light_mode)
                 setpowerSaving(data.powersaving)
-
+                setaddedDevices(data.MAC_array)
                 setreadyToRemote(true)
 
             }
@@ -178,16 +178,22 @@ const Remote = ({service}) => {
         let modifiedDevices = addedDevices
         modifiedDevices = modifiedDevices.filter((device)=>{return device!=p_device})
         setaddedDevices(modifiedDevices)
-        // TODO : send to NodeMCU
+        
+        client.write("cmd_del " + p_device + " \n")
     }
 
     const addThisDevice = (p_device) => {
+        if(p_device.length != 17)
+        {
+            return
+        }
         p_device = p_device.toUpperCase()
         let modifiedDevices = addedDevices
         modifiedDevices = modifiedDevices.filter((device)=>{return device!=p_device})
         modifiedDevices.push(p_device)
         setaddedDevices(modifiedDevices)
-        // TODO : send to NodeMCU
+        
+        client.write("cmd_add " + p_device + " \n")
     }
 
     if(!readyToRemote)
