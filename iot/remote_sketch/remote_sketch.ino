@@ -1,14 +1,31 @@
 #include <ESP8266WiFi.h>        // Include the Wi-Fi library
 #include <ESP8266WiFiMulti.h>   // Include the Wi-Fi-Multi library
 #include <ESP8266mDNS.h>        // Include the mDNS library
- 
+ #include <FastLED.h>           // Include the LED control library
+
+#define LED_PIN 4               //Pin number for LED
+#define NUM_LEDS 7              // Number of LEDs on strip
+
+CRGB leds[NUM_LEDS];
+
+/*
+  leds[0] = CRGB(255, 0, 0 );
+  leds[1] = CRGB(0, 255, 0 );
+  leds[2] = CRGB(0 , 0 , 255);
+  FastLED.show();
+*/
+
+
+
 ESP8266WiFiMulti wifiMulti;
 
 WiFiServer wifiServer(80);
 
-int PrimaryRGB[] = {255, 255, 255};
+int PrimaryRGB[] = {255 , 255, 255};
 int SecondaryRGB[] = {255, 255, 255};
-String light_mode = "static";
+int default_time_period = 1000;
+int time_period = 1000;         //Time period is 1second
+String light_mode = "basic";
 bool powersaving = false;
 
 char MAC_array[17][50];
@@ -19,7 +36,7 @@ String make_data()
   String ret = "{";
   ret += "\"PrimaryRGB\" : ";
   ret += "[";
-  ret += PrimaryRGB[0];
+  ret += PrimaryRGB[0];        
   ret += ", ";
   ret += PrimaryRGB[1];
   ret += ", ";
@@ -29,7 +46,7 @@ String make_data()
   
   ret += "\"SecondaryRGB\" : ";
   ret += "[";
-  ret += SecondaryRGB[0];
+  ret += SecondaryRGB[0];       
   ret += ", ";
   ret += SecondaryRGB[1];
   ret += ", ";
@@ -92,8 +109,14 @@ uint8_t* getMacBytesFromString(char* mac)
 void setup() {
   Serial.begin(9600);
 
+  //LED strip setup code
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
+  FastLED.clear();
+  FastLED.show();
+
   // WIFI connection code
-  wifiMulti.addAP("R2D2", "ChaChaCha"); 
+  wifiMulti.addAP("Cringe", "12345678"); 
   Serial.println("Connecting ...");
   int i = 0;
   while (wifiMulti.run() != WL_CONNECTED) {
@@ -132,7 +155,7 @@ void handle_cmd(String cmd)
       PrimaryRGB[i] = col;
       working_cmd = working_cmd.substring(next_ind+1);
       Serial.println(PrimaryRGB[i]);
-    }
+    }  
   }
 
   if(cmd.startsWith("cmd_sec"))
@@ -205,9 +228,57 @@ void handle_cmd(String cmd)
     Serial.println(powersaving);
   }
 }
+
+int ambient_color_interpolation(int val1, int val2){
+  float diff = millis()%(2*time_period);
+  float lin_val;
+  if(diff < time_period)
+    lin_val = val1+((val2-val1)*diff)/time_period;
+  else{
+    diff -= time_period;
+    lin_val = val2+((val1-val2)*diff)/time_period;
+  }
+    
+  return int(lin_val);
+}
+
+void setLEDColor() {
+  if(light_mode == "basic"){
+    for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+  }
+  if(light_mode == "static"){
+    for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+    for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+  }
+  if(light_mode == "dynamic"){
+    if( (millis() % time_period) > time_period/2)
+      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+    else          
+      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);  
+  }
+  if(light_mode == "dynamic2"){
+    if ((millis() % time_period) > time_period/2 ){
+      for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+      for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+    }
+    else{
+      for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+      for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+    }
+  }
+  if(light_mode == "ambient"){
+    int r = ambient_color_interpolation(PrimaryRGB[0],SecondaryRGB[0]);
+    int g = ambient_color_interpolation(PrimaryRGB[1],SecondaryRGB[1]);
+    int b = ambient_color_interpolation(PrimaryRGB[2],SecondaryRGB[2]);
+
+    for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(r,g,b);
+  }
+  FastLED.show();
+}
+
 void loop() {
   MDNS.update();
-
+  setLEDColor();
   //socket 
   WiFiClient client = wifiServer.accept();
   if (client)
@@ -223,9 +294,11 @@ void loop() {
         String line = client.readStringUntil('\n');
         Serial.println(line);
         handle_cmd(line);
+        setLEDColor();
       }
+      setLEDColor();
     }
-
+    setLEDColor();
     while (client.available()) {
       // but first, let client finish its request
       // that's diplomatic compliance to protocols
