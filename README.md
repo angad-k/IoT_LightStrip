@@ -59,6 +59,6 @@ Following is the list of features :
 
 ## Mobile App
 
-- You can download our app from releases.
+- You can download our app from [releases](https://github.com/angad-k/IoT_LightStrip/releases/tag/1.0).
 - You need to be on the same WiFi network as the ESP8266.
 - App will automically connect and control all settings of the device.
