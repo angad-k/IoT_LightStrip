@@ -21,15 +21,26 @@ ESP8266WiFiMulti wifiMulti;
 
 WiFiServer wifiServer(80);
 
+//Set WiFi Credentials
+const char* SSID = "";
+const char* password = "";
+
 int PrimaryRGB[] = {255 , 255, 255};
 int SecondaryRGB[] = {255, 255, 255};
 int default_time_period = 1000;
-int time_period = 1000;         //Time period is 1second
+int time_period = 1000;         //LED lighting mode time period is 1second
 String light_mode = "basic";
 bool powersaving = false;
 
 char MAC_array[17][50];
 int MAC_arraylength = 0;
+
+bool connected = 0;
+int disconn_time = -1;    
+int reconn_period = 1000; //Arduino tries to reconnect to WiFi every reconn_period milliseconds
+
+int lastRead = 0;
+int timeOutPeriod = 5000;
 
 String make_data()
 {
@@ -106,23 +117,15 @@ uint8_t* getMacBytesFromString(char* mac)
   return bytes;
 }
 
-void setup() {
-  Serial.begin(9600);
-
-  //LED strip setup code
-  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
-  FastLED.clear();
-  FastLED.show();
-
-  // WIFI connection code
-  wifiMulti.addAP("Cringe", "12345678"); 
+void setupWifi(){
+  wifiMulti.addAP(SSID, password); 
   Serial.println("Connecting ...");
-  int i = 0;
+
   while (wifiMulti.run() != WL_CONNECTED) {
     delay(250);
     Serial.print('.');
   }
+  connected = 1;
   Serial.println('\n');
   Serial.print("Connected to ");
   Serial.println(WiFi.SSID());
@@ -140,6 +143,44 @@ void setup() {
   }
   MDNS.addService("http", "tcp", 80);
   Serial.println("mDNS responder started");
+}
+
+void reconnectWifi(){
+  if(wifiMulti.run() == WL_CONNECTED){
+    connected = 1;
+    disconn_time = -1;
+    Serial.println('\n');
+    Serial.print("Connected to ");
+    Serial.println(WiFi.SSID());
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.localIP());  
+    WiFi.mode(WIFI_STA);
+    delay(100);
+
+    wifiServer.begin();
+
+    // MDNS (NSD) code
+    if (!MDNS.begin("LightStrip")) {
+      Serial.println("Error setting up MDNS responder!");
+    }
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("mDNS responder started");
+  }
+  else{
+    disconn_time = millis();
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  //LED strip setup code
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
+  FastLED.clear();
+  FastLED.show();
+  
+  setupWifi();
 }
 
 void handle_cmd(String cmd)
@@ -243,35 +284,40 @@ int ambient_color_interpolation(int val1, int val2){
 }
 
 void setLEDColor() {
-  if(light_mode == "basic"){
-    for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+  if(powersaving){
+    for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(0,0,0);
   }
-  if(light_mode == "static"){
-    for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
-    for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
-  }
-  if(light_mode == "dynamic"){
-    if( (millis() % time_period) > time_period/2)
-      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
-    else          
-      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);  
-  }
-  if(light_mode == "dynamic2"){
-    if ((millis() % time_period) > time_period/2 ){
+  else{
+    if(light_mode == "basic"){
+      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+    }
+    if(light_mode == "static"){
       for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
       for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
     }
-    else{
-      for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
-      for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+    if(light_mode == "dynamic"){
+      if( (millis() % time_period) > time_period/2)
+        for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+      else          
+        for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);  
     }
-  }
-  if(light_mode == "ambient"){
-    int r = ambient_color_interpolation(PrimaryRGB[0],SecondaryRGB[0]);
-    int g = ambient_color_interpolation(PrimaryRGB[1],SecondaryRGB[1]);
-    int b = ambient_color_interpolation(PrimaryRGB[2],SecondaryRGB[2]);
+    if(light_mode == "dynamic2"){
+      if ((millis() % time_period) > time_period/2 ){
+        for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+        for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+      }
+      else{
+        for(int i = 1; i < NUM_LEDS; i+=2) leds[i] = CRGB(SecondaryRGB[0],SecondaryRGB[1],SecondaryRGB[2]);
+        for(int i = 0; i < NUM_LEDS; i+=2) leds[i] = CRGB(PrimaryRGB[0],PrimaryRGB[1],PrimaryRGB[2]);
+      }
+    }
+    if(light_mode == "ambient"){
+      int r = ambient_color_interpolation(PrimaryRGB[0],SecondaryRGB[0]);
+      int g = ambient_color_interpolation(PrimaryRGB[1],SecondaryRGB[1]);
+      int b = ambient_color_interpolation(PrimaryRGB[2],SecondaryRGB[2]);
 
-    for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(r,g,b);
+      for(int i = 0; i < NUM_LEDS; i++) leds[i] = CRGB(r,g,b);
+    }
   }
   FastLED.show();
 }
@@ -280,31 +326,42 @@ void loop() {
   MDNS.update();
   setLEDColor();
   //socket 
-  WiFiClient client = wifiServer.accept();
+  if(!WiFi.isConnected() && connected){
+    connected = 0;
+    disconn_time = millis();
+    Serial.println("Disconnected from WiFi");
+  }
+  if (!connected & millis()-disconn_time > reconn_period){
+    Serial.println("Trying to reconnect...");
+    reconnectWifi();
+  }
+  WiFiClient client = wifiServer.available();
   if (client)
   {
     Serial.println("\n[Client connected]");
     client.println(make_data());
     while (client.connected())
     {
-      
+      setLEDColor();
       // read line by line what the client (web browser) is requesting
       if (client.available())
       {
         String line = client.readStringUntil('\n');
+        if(line != ""){
+          lastRead = millis();
+          Serial.println("Read line");
+        }
+        else{
+          if(millis() - lastRead > timeOutPeriod)
+            {
+              client.flush();
+              Serial.println("Flushed");
+            }
+        }
         Serial.println(line);
         handle_cmd(line);
         setLEDColor();
       }
-      setLEDColor();
-    }
-    setLEDColor();
-    while (client.available()) {
-      // but first, let client finish its request
-      // that's diplomatic compliance to protocols
-      // (and otherwise some clients may complain, like curl)
-      // (that is an example, prefer using a proper webserver library)
-      client.read();
     }
 
     // close the connection:

@@ -266,7 +266,6 @@ void setup() {
     setupWiFi();        // connect wifi
     setupSinricPro();  // setup SinricPro
     FastLED.clear();
-    Serial.println("PAIN");
     FastLED.show();     // setup LED control
 }
 
