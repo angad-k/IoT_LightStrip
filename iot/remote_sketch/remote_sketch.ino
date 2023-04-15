@@ -256,7 +256,7 @@ void handle_cmd(String cmd)
 
   if(cmd.startsWith("cmd_pow"))
   {
-    if(cmd[8]==0)
+    if(cmd[8]== '0')
     {
       powersaving = false;
     }
