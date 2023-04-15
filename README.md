@@ -25,7 +25,7 @@ The goal is to control a WS2812B LED Strip using Google Home and Alexa. We have 
 
 ![WhatsApp Image 2023-04-15 at 15 40 29](https://user-images.githubusercontent.com/54415525/232209250-3f9bcf82-cadc-4bd8-9b4a-7b9fb00abd42.jpeg)
 
-The above images are for representation purposes. In the actual setup, we use NodeMCU ESP8266 instead of Arduino Uno and we connect the TN wire of the WS2812B to GPIO4 of ESP8266.
+The above images are for representation purposes. In the actual setup, we use NodeMCU ESP8266 instead of Arduino Uno and we connect the D_in wire of the WS2812B to GPIO4 of ESP8266.
 
 # Features
 
@@ -60,5 +60,5 @@ Following is the list of features :
 ## Mobile App
 
 - You can download our app from releases.
-- You need to be on the same WiFi network as the ESP866.
+- You need to be on the same WiFi network as the ESP8266.
 - App will automically connect and control all settings of the device.
